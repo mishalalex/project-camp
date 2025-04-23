@@ -1,0 +1,254 @@
+Goal - To create a project management system
+
+Features - 
+1. User work on different projects
+2. Each project has it's own admin and it's members
+3. Each project has its tasks and sub tasks with attachments
+4. Each project needs to have the ability to write notes
+
+
+Bolier Plate setup (not defined anywhere but we need to have it) - 
+1. npm init -y
+2. npm i express mongoose dotenv cors express-validator bcryptjs jsonwebtoken
+3. npm install --save-dev prettier (code format)
+    1. file -> .prettierrc -> copy paste from web general prettier format which needs to be shared and implemented by all users in the project
+    2. file -> .prettierignore -> node_module, .env (wherever prettier formating is not needed)
+4. package.json -> "type": "module"
+5. file -> .env / .env.example / .env.local
+6. file -> Readme.md (all details of the project)
+7. folder -> public (keep static files)
+    1. folder -> images (like favicon files)
+    2. file -> .gitkeep (empty file -> kept to track changes in git)
+8. folder -> src
+    1. cd src 
+    2. mkdir controllers db middlewares models routes utils validators (make folders in one go)
+
+START CODING FROM HERE
+
+9. file -> src/app.js 
+    1. configure express (make an app and export it)
+
+10. update -> .env 
+    1. configure PORT (say PORT=8000)
+    2. configure MONGO_DB_CONNECTION_STRING
+
+11. file -> db/index.js 
+    1. configure mongoose
+    2. import mongodb connection string from .env
+    3. connectdb with an async await function (process.exit(1) in catch part)
+    4. export it
+
+12. Standardise Errors
+    file -> utils/api-error.js 
+    1. class ApiError extends Error {
+        constructor(statusCode, message, errors=[], stack=""){
+            super(message);
+            this.statusCode = statusCode;
+            this.message = message;
+            this.success = false;
+            this.errors = errors;
+            if(stack){
+                this.stack = stack;
+            } else {
+                Error.captureStackTrace(this,this.constructor)
+            }
+        }
+    }
+    export {ApiError}
+
+13. Standardise Response
+    file -> utils/api-response.js 
+    1. class ApiResponse {
+        constructor(statusCode, data, message="Success"){
+            this.statusCode = statusCode;
+            this.data = data;
+            this.message = message;
+            this.success = statusCode > 400;
+        }
+    }
+    export {ApiResponse}
+
+14. Declare general project constants and export them as both objects (to get the default) & arrays (get all the data)
+    file -> utils/constants.js 
+
+    export const UserRolesEnum = {
+        ADMIN: "admin",
+        PROJECT_ADMIN: "project_admin",
+        MEMBER: "member"
+    }
+    export const AvailableUserRoles = Object.values(UserRolesEnum)
+
+    export const TaskStatusEnum = {
+        TODO: "todo",
+        IN_PROGRESS: "in_progress",
+        DONE: "done"
+    }
+
+    export const AvailableTaskStatuses = Object.values(TaskStatusEnum)
+
+15. file -> src/index.js 
+    1. import the express app in app.js 
+    2. configure dotenv 
+        1. import dotenv    
+        2. dotenv.config({path:"./.env"})
+        3. get the PORT from .env file
+    3. import connectdb().then(app.listen(PORT)).catch()
+
+16. Standardise Mongo Models
+    1. cd src/models
+    2. touch user.model.js task.model.js subtask.model.js project.model.js project_member.model.js note.models.js 
+    3. create the standard model schema for all models in this format
+        import mongoose, {Scheme} from "mongoose";
+        const xSchema = new Schema({
+            (to get from other schema)x: {
+                type: Schema.Types.ObjectId,
+                ref: "X",
+                (optional)required: [true, "x reference is required"],
+                (optional for strings)trim:true
+            },
+            attachments: {
+                type: [
+                    {
+                        url: String,
+                        mimeType: String,
+                        size:   Number
+                    }
+                ],
+                default:[]
+            },
+            avatar: {
+                type: {
+                    url: String,
+                    localpath: String
+                }, default: {
+                    url: "https://placehold.co/600x400",
+                    localpath: ""
+                }
+            },
+            username: {
+                type: String,
+                required: true,
+                unique: true,
+                required: true,
+                index: true,
+                lowercase: true
+            }
+        },{(optional)timestamps: true});
+        export const X = mongoose.model("X", xSchema)
+    3. add pre and post hooks 
+        userSchema.pre("save", async function(next){
+            if(!this.isModified("password")) return next();
+            this.password = await bcrypt.hash(this.password, 10);
+            next();
+        })
+    4. add methods in Schema
+        userSchema.methods.isPasswordCorrect = async function(password){
+            return await bcrypt.compare(password, this.password)
+        }
+
+        userSchema.methods.generateAccessToken = function(){
+            return jwt.sign({
+                _id: this._id,
+                email: this.email,
+                username: this.username
+            },
+            process.env.JWT_ACCESS_SECRET,
+            {expiresIn: process.env.JWT_ACCESS_EXPIRESIN})
+        }
+
+        userSchema.methods.generateTempToken = function(){
+            const unhashedToken = crypto.randomBytes(32).toString("hex);
+            const hashedToken = crypto.createHash("sha256").update(unhashedToken).digest("hex")
+            const tokenExpiry = Date.now()+(20*60*1000);
+
+            return {hashedToken, unhashedToken, tokenExpiry}
+        }
+17. create files
+    cd src/controllers
+    touch healthCheck.controller.js auth.controller.js note.controller.js project.controller.js task.controller.js  
+
+18. create files
+    cd ../routes
+    touch healthCheck.route.js auth.route.js note.route.js project.route.js task.route.js 
+
+19. write healthcheck controller
+    import {ApiResponse} from "../utils/api-response.js " 
+    const healthCheck = (req,res) => {
+        res.status(200).json({
+            new ApiResponse(200,{message: "Server is running"})
+        })
+    }
+    export {healthCheck};
+
+20 write healthCheck route
+    import {Router} from "express";
+    import {X} from "../controller/<>.js"
+    const router = Router()
+    router.route("/).get(X)
+    export defualt router;
+
+21. update app.js with the router details
+    1. import the router to user
+    2. write app.use("/api/v1/healthCheck",healthCheckRouter)
+
+22. write async handler in utils to centralise try-catch block for all controllers
+    1. store the asyncHandler in utils
+    function asyncHandler(requestHandler){
+        return function(req,res,next){
+            Promise.resolve(requestHandler(req,res,next))
+            .catch(function(err){
+                next(err)
+            })
+        }
+    }
+    export {asyncHandler}
+    2. all controllers where they are written must be wrapped within asyncHandler to handle all errors effectively
+
+23. write validators for userRegistration and login validators using express-validator librabry
+    1. const userRegistrationValidator = () => {
+        return[
+            body("email)
+                .trim()
+                .notEmpty().withMessage("Email should not be empty")
+                .isEmail().withMessage("This should be a email"),
+            body("username")
+                .trim()
+                .notEmpty().withMessage("Username should not be empty")
+                .isLength({min: 3}).withMessage("Username should be of at least 3 chars")
+                .isLength({max:15}).withMessage("Username should not be more than 15 characters")
+                ]
+        }
+    2. const LoginValidator = () => {
+        return[
+            body("email")
+                .isEmail().withMessage("Email is not valid"),
+            body("password")
+                .notEmpty().withMessage("Password should not be empty")
+
+        ]
+    }
+    3. export {userRegistrationValidator,LoginValidator}
+
+24. write a generic middleware which uses express-validator
+    1.  import {} from "../util/api-errors.js"
+        import {validationResult} from "express-validator";
+        
+        export const validate = (req,res,next) => {
+            const errors = validationResult(req);
+            if(errors.isEmpty()){
+                return next();
+            }
+            const extractedErrors = [];
+            errors.array().map((eachError) => {
+                [eachError.path]:eachError.msg
+            })
+            throw new ApiError(400,"Request validation failed", extractedErrors)
+        }
+
+25. use the middleware and validator in the router
+    1. import middleware
+    2. import validator
+    3. set the route, use the validator(), middleware & controller in that order
+
+26. write a utility to work with emails (mailgun and nodemailer)
+    1. npm install mailgun & nodemailer 
