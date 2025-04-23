@@ -252,4 +252,13 @@ START CODING FROM HERE
 
 26. write a utility to work with emails (mailgun and nodemailer)
     1. npm install mailgun (crafting the email we want to send) & nodemailer (sending an email)
-    2. 
+    2. Look at the examples from their NPM site - https://www.npmjs.com/package/mailgen || https://www.npmjs.com/package/nodemailer
+    3. file -> utils/mail.js
+    4. import mailgun and nodemailer
+    5. configure the sendMail method:
+        1. configure the nodmailer transporter (using mailtrap settings)
+        2. configure the mailgen theme and project info using mailGenerator method
+        3. generate a plain-text version and html version of content for the email
+        4. configure the from, to, subject, and content (plain text and html) of the mail to be send using above info
+        5. using nodemailer transporter, send the above configured email in a try-catch block
+    6. Now we can use this sendMail method to craft and send custom emails
