@@ -251,4 +251,5 @@ START CODING FROM HERE
     3. set the route, use the validator(), middleware & controller in that order
 
 26. write a utility to work with emails (mailgun and nodemailer)
-    1. npm install mailgun & nodemailer 
+    1. npm install mailgun (crafting the email we want to send) & nodemailer (sending an email)
+    2. 
